@@ -1,8 +1,9 @@
 import * as path from 'path';
 import * as colors from 'colors/safe';
 import * as fs from 'fs-extra';
+import { findup } from './util';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const bundled = require('npm-bundled');
+const npmbundled = require('npm-bundled');
 
 // do not descend into these directories when searching for `package.json` files.
 export const PKGLINT_IGNORES = ['node_modules', 'cdk.out', '.cdk.staging'];
@@ -211,11 +212,28 @@ export class PackageJson {
     return Object.keys(this.json.dependencies || {}).filter(predicate).map(name => ({ name, version: this.json.dependencies[name] }));
   }
 
+  public getBundledDependencies(): string[] {
+    return this.json.bundledDependencies || this.json.bundleDependencies || [];
+  }
+
   /**
    * Retrieves all packages that are bundled in, including transitive bundled dependency of a bundled dependency.
    */
   public getAllBundledDependencies(): string[] {
-    return bundled.sync({ path: this.packageRoot });
+    // Unfortunately, 'npm-bundled' does not know how to handle monorepos, so the hack below is required.
+    const repoRoot = findup(this.packageRoot, 'packages');
+    if (!repoRoot) { throw new Error('Cannot locate repo root'); }
+    const bundled: string[] = [];
+    let queue: PackageJson[] = [];
+    queue.push(this);
+    while (queue.length > 0) {
+      let pkgJson = queue[0];
+      bundled.push(...npmbundled.sync({ path: pkgJson.packageRoot }));
+      const cdkBundled = pkgJson.getBundledDependencies().filter(deps => deps.startsWith('@aws-cdk'));
+      queue.push(...cdkBundled.map(b => PackageJson.fromDirectory(path.join(repoRoot, 'packages', b))));
+      queue = queue.slice(1);
+    }
+    return [...new Set(bundled)];
   }
 
   /**

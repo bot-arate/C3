@@ -190,3 +190,18 @@ export function* findInnerPackages(dir: string): IterableIterator<string> {
     yield* findInnerPackages(path.join(dir, fname));
   }
 }
+
+export function findup(fromDir: string, find: string) : string | undefined {
+  let dir = fromDir;
+  let prevdir: string | undefined = undefined;
+  let found = false;
+  while (dir !== prevdir && !found) {
+    found = fs.readdirSync(dir).find(x => x === find) !== undefined;
+    prevdir = dir;
+    dir = path.dirname(dir);
+  }
+  if (!found) {
+    return undefined;
+  }
+  return prevdir;
+}
