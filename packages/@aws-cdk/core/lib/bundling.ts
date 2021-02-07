@@ -88,19 +88,6 @@ export interface ILocalBundling {
 }
 
 /**
- * Options for starting a container.
- */
-export interface DockerStartOptions {
-
-  /**
-   * Attach STDOUT/STDERR and forward signals.
-   *
-   * @default false
-   */
-  readonly attach?: boolean;
-}
-
-/**
  * A Docker image used for asset bundling
  */
 export class BundlingDockerImage {
@@ -427,4 +414,17 @@ export class BundlingDockerContainer {
       throw new Error(`Failed to copy files from ${src} to ${dst}: ${err}`);
     }
   }
+}
+
+/**
+ * Options for starting a container.
+ */
+export interface DockerStartOptions {
+
+  /**
+   * Attach STDOUT/STDERR and forward signals.
+   *
+   * @default false
+   */
+  readonly attach?: boolean;
 }
