@@ -119,9 +119,6 @@ export class Asset extends CoreConstruct implements cdk.IAsset {
    */
   public readonly sourceHash: string;
 
-  /**
-   * asd
-   */
   public readonly assetHash: string;
 
   constructor(scope: Construct, id: string, props: AssetProps) {
