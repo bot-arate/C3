@@ -101,67 +101,6 @@ export interface DockerStartOptions {
 }
 
 /**
- * A docker container used for asset bundling.
- */
-export class BundlingDockerContainer {
-
-  constructor(
-    /**
-     * The container id.
-     */
-    public readonly id: string,
-  ) {}
-
-  /**
-   * Copy files/directories from the host to the container.
-   *
-   * @param hostPath source path on the host.
-   * @param containerPath destination path in the container.
-   */
-  public copyTo(hostPath: string, containerPath: string) {
-    return this.cp(hostPath, `${this.id}:${containerPath}`);
-  }
-
-  /**
-   * Copy files/directories from the container to the host.
-   *
-   * @param containerPath source path in the container.
-   * @param hostPath destination path on the host.
-   */
-  public copyFrom(containerPath: string, hostPath: string) {
-    return this.cp(`${this.id}:${containerPath}`, hostPath);
-  }
-
-  /**
-   * Start the container.
-   *
-   * @param options start options.
-   */
-  public start(options: DockerStartOptions = {}) {
-    const args = ['start'];
-    if (options.attach ?? false) {
-      args.push('-a');
-    }
-    dockerExec([...args, this.id]);
-  }
-
-  /**
-   * Remove the container and all associated volumes.
-   */
-  public remove() {
-    dockerExec(['rm', '-vf', this.id]);
-  }
-
-  private cp(src: string, dst: string) {
-    try {
-      dockerExec(['cp', src, dst]);
-    } catch (err) {
-      throw new Error(`Failed to copy files from ${src} to ${dst}: ${err}`);
-    }
-  }
-}
-
-/**
  * A Docker image used for asset bundling
  */
 export class BundlingDockerImage {
@@ -237,8 +176,6 @@ export class BundlingDockerImage {
     } finally {
       container.remove();
     }
-
-
   }
 
   /**
@@ -407,9 +344,8 @@ function flatten(x: string[][]) {
   return Array.prototype.concat([], ...x);
 }
 
-export function dockerExec(args: string[], options?: SpawnSyncOptions) {
+function dockerExec(args: string[], options?: SpawnSyncOptions) {
   const prog = process.env.CDK_DOCKER ?? 'docker';
-  // throw new Error(`about to run: ${prog} ${args.join(' ')}`);
   const proc = spawnSync(prog, args, options ?? {
     stdio: [ // show Docker output
       'ignore', // ignore stdio
@@ -430,4 +366,65 @@ export function dockerExec(args: string[], options?: SpawnSyncOptions) {
   }
 
   return proc;
+}
+
+/**
+ * A docker container used for asset bundling.
+ */
+export class BundlingDockerContainer {
+
+  constructor(
+    /**
+     * The container id.
+     */
+    public readonly id: string,
+  ) {}
+
+  /**
+   * Copy files/directories from the host to the container.
+   *
+   * @param hostPath source path on the host.
+   * @param containerPath destination path in the container.
+   */
+  public copyTo(hostPath: string, containerPath: string) {
+    return this.cp(hostPath, `${this.id}:${containerPath}`);
+  }
+
+  /**
+   * Copy files/directories from the container to the host.
+   *
+   * @param containerPath source path in the container.
+   * @param hostPath destination path on the host.
+   */
+  public copyFrom(containerPath: string, hostPath: string) {
+    return this.cp(`${this.id}:${containerPath}`, hostPath);
+  }
+
+  /**
+   * Start the container.
+   *
+   * @param options start options.
+   */
+  public start(options: DockerStartOptions = {}) {
+    const args = ['start'];
+    if (options.attach ?? false) {
+      args.push('-a');
+    }
+    dockerExec([...args, this.id]);
+  }
+
+  /**
+   * Remove the container and all associated volumes.
+   */
+  public remove() {
+    dockerExec(['rm', '-vf', this.id]);
+  }
+
+  private cp(src: string, dst: string) {
+    try {
+      dockerExec(['cp', src, dst]);
+    } catch (err) {
+      throw new Error(`Failed to copy files from ${src} to ${dst}: ${err}`);
+    }
+  }
 }
