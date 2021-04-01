@@ -1,22 +1,13 @@
 /// !cdk-integ pragma:ignore-assets
 import { Mesh } from '@aws-cdk/aws-appmesh';
 import * as ecs from '@aws-cdk/aws-ecs';
-import * as secretsManager from '@aws-cdk/aws-secretsmanager';
 import { App, Stack } from '@aws-cdk/core';
-import { AppMeshExtension, DatadogAgent, Container, Environment, HttpLoadBalancerExtension, Service, ServiceDescription } from '../lib';
+import { AppMeshExtension, OpenTelemetryCollector, CloudWatchLogsExtension, Container, Environment, HttpLoadBalancerExtension, ScaleOnCpuUtilization, Service, ServiceDescription } from '../lib';
 
 const app = new App();
 const stack = new Stack(app, 'aws-ecs-integ');
 const mesh = new Mesh(stack, 'my-mesh');
 const environment = new Environment(stack, 'production');
-
-// Substitute in your own secret when running the integration test
-const SECRET_ARN = 'arn:aws:secretsmanager:us-west-2:209640446841:secret:datadog-api-key-secret-JxST1g';
-
-// Import a secret from the account.
-const datadogApiKey = secretsManager.Secret.fromSecretAttributes(stack, 'datadog-api-key-secret', {
-  secretCompleteArn: SECRET_ARN,
-});
 
 /** Name service */
 const nameDescription = new ServiceDescription();
@@ -27,14 +18,15 @@ nameDescription.add(new Container({
   image: ecs.ContainerImage.fromAsset('./test-apps/name'),
   environment: {
     PORT: '80',
-    TEST_DATADOG: 'true',
+    TEST_XRAY: 'true',
   },
 }));
 nameDescription.add(new AppMeshExtension({ mesh }));
-nameDescription.add(new DatadogAgent({
-  apmEnabled: true,
-  traceAnalyticsEnabled: true,
-  datadogApiKey: ecs.Secret.fromSecretsManager(datadogApiKey),
+nameDescription.add(new OpenTelemetryCollector());
+nameDescription.add(new CloudWatchLogsExtension());
+nameDescription.add(new ScaleOnCpuUtilization({
+  initialTaskCount: 2,
+  minTaskCount: 2,
 }));
 
 const nameService = new Service(stack, 'name', {
@@ -51,14 +43,15 @@ greetingDescription.add(new Container({
   image: ecs.ContainerImage.fromAsset('./test-apps/greeting'),
   environment: {
     PORT: '80',
-    TEST_DATADOG: 'true',
+    TEST_XRAY: 'true',
   },
 }));
 greetingDescription.add(new AppMeshExtension({ mesh }));
-greetingDescription.add(new DatadogAgent({
-  apmEnabled: true,
-  traceAnalyticsEnabled: true,
-  datadogApiKey: ecs.Secret.fromSecretsManager(datadogApiKey),
+greetingDescription.add(new OpenTelemetryCollector());
+greetingDescription.add(new CloudWatchLogsExtension());
+greetingDescription.add(new ScaleOnCpuUtilization({
+  initialTaskCount: 2,
+  minTaskCount: 2,
 }));
 
 const greetingService = new Service(stack, 'greeting', {
@@ -75,18 +68,19 @@ greeterDescription.add(new Container({
   image: ecs.ContainerImage.fromAsset('./test-apps/greeter'),
   environment: {
     PORT: '80',
-    TEST_DATADOG: 'true',
     GREETING_URL: 'http://greeting.production',
     NAME_URL: 'http://name.production',
+    TEST_XRAY: 'true',
   },
 }));
 greeterDescription.add(new AppMeshExtension({ mesh }));
-greeterDescription.add(new DatadogAgent({
-  apmEnabled: true,
-  traceAnalyticsEnabled: true,
-  datadogApiKey: ecs.Secret.fromSecretsManager(datadogApiKey),
-}));
+greeterDescription.add(new OpenTelemetryCollector());
+greeterDescription.add(new CloudWatchLogsExtension());
 greeterDescription.add(new HttpLoadBalancerExtension());
+greeterDescription.add(new ScaleOnCpuUtilization({
+  initialTaskCount: 2,
+  minTaskCount: 2,
+}));
 
 const greeterService = new Service(stack, 'greeter', {
   environment: environment,
@@ -95,11 +89,3 @@ const greeterService = new Service(stack, 'greeter', {
 
 greeterService.connectTo(nameService);
 greeterService.connectTo(greetingService);
-
-/**
- * 1. Create a Datadog account and get your Datadog API key
- * 2. Put the API key into Secret Manager, and change the SECRET_ARN env variable
- *    in this test to the right ARN
- * 3. Expectation is that when you deploy this stack you should see service metrics,
- *    and traces across all three services start showing up in DataDog.
- */

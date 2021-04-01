@@ -2,10 +2,10 @@ import { expect, haveResourceLike } from '@aws-cdk/assert';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as cdk from '@aws-cdk/core';
 import { Test } from 'nodeunit';
-import { CloudwatchAgentExtension, Container, Environment, Service, ServiceDescription } from '../lib';
+import { OpenTelemetryCollector, Container, Environment, Service, ServiceDescription } from '../lib';
 
 export = {
-  'should be able to add AWS X-Ray to a service'(test: Test) {
+  'should be able to add CloudWatch logs to a service'(test: Test) {
     // GIVEN
     const stack = new cdk.Stack();
 
@@ -20,7 +20,7 @@ export = {
       image: ecs.ContainerImage.fromAsset('./test/test-apps/name'),
     }));
 
-    serviceDescription.add(new CloudwatchAgentExtension());
+    serviceDescription.add(new OpenTelemetryCollector());
 
     new Service(stack, 'my-service', {
       environment,
@@ -28,17 +28,10 @@ export = {
     });
 
     // THEN
-
     expect(stack).to(haveResourceLike('AWS::ECS::TaskDefinition', {
       ContainerDefinitions: [
         {
           Cpu: 256,
-          DependsOn: [
-            {
-              Condition: 'START',
-              ContainerName: 'cloudwatch-agent',
-            },
-          ],
           Essential: true,
           Memory: 512,
           Name: 'app',
@@ -57,28 +50,56 @@ export = {
           ],
         },
         {
-          Environment: [
-            {
-              Name: 'CW_CONFIG_CONTENT',
-              Value: '{"logs":{"metrics_collected":{"emf":{}}},"metrics":{"metrics_collected":{"statsd":{}}}}',
-            },
-          ],
           Essential: true,
-          Image: 'amazon/cloudwatch-agent:latest',
+          Image: 'amazon/aws-otel-collector:latest',
           LogConfiguration: {
             LogDriver: 'awslogs',
             Options: {
               'awslogs-group': {
-                Ref: 'myservicetaskdefinitioncloudwatchagentLogGroupDF0CD679',
+                Ref: 'myservicetaskdefinitionopentelemetrycollectorLogGroup174A94C6',
               },
-              'awslogs-stream-prefix': 'cloudwatch-agent',
+              'awslogs-stream-prefix': 'open-telemetry-collector',
               'awslogs-region': {
                 Ref: 'AWS::Region',
               },
             },
           },
           MemoryReservation: 50,
-          Name: 'cloudwatch-agent',
+          Name: 'open-telemetry-collector',
+          PortMappings: [
+            {
+              ContainerPort: 55680,
+              Protocol: 'tcp',
+            },
+          ],
+          Secrets: [
+            {
+              Name: 'AOT_CONFIG_CONTENT',
+              ValueFrom: {
+                'Fn::Join': [
+                  '',
+                  [
+                    'arn:',
+                    {
+                      Ref: 'AWS::Partition',
+                    },
+                    ':ssm:',
+                    {
+                      Ref: 'AWS::Region',
+                    },
+                    ':',
+                    {
+                      Ref: 'AWS::AccountId',
+                    },
+                    ':parameter/',
+                    {
+                      Ref: 'myserviceopentelemetryconfig9F91561F',
+                    },
+                  ],
+                ],
+              },
+            },
+          ],
           User: '0:1338',
         },
       ],

@@ -1,9 +1,9 @@
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as awslogs from '@aws-cdk/aws-logs';
-import * as cdk from '@aws-cdk/core';
 import { Service } from '../service';
 import { Container } from './container';
 import { ContainerMutatingHook, ServiceExtension } from './extension-interfaces';
+import { Construct } from '@aws-cdk/core';
 
 /**
  * Settings for the hook which mutates the application container
@@ -74,14 +74,12 @@ export class CloudWatchLogsExtension extends ServiceExtension {
     }
   }
 
-  public prehook(service: Service, scope: cdk.Construct) {
+  public prehook(service: Service, scope: Construct) {
     this.parentService = service;
 
     if (!this.logGroup) {
-      // If the user did not manually pass a log group in create one
-      this.logGroup = new awslogs.LogGroup(scope, `${service.id}-logs`, {
-        logGroupName: `${service.id}-logs`,
-      });
+      // If the user did not manually pass a log group in then create one for them
+      this.logGroup = new awslogs.LogGroup(scope, `${service.id}-logs`);
     }
   }
 

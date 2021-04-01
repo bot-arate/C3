@@ -1,3 +1,4 @@
+/// !cdk-integ pragma:ignore-assets
 import { Mesh } from '@aws-cdk/aws-appmesh';
 import { ContainerImage } from '@aws-cdk/aws-ecs';
 import { App, Stack } from '@aws-cdk/core';
@@ -18,6 +19,7 @@ nameDescription.add(new Container({
   image: ContainerImage.fromAsset('./test-apps/name'),
   environment: {
     PORT: '80',
+    TEST_XRAY: 'true',
   },
 }));
 nameDescription.add(new AppMeshExtension({ mesh }));
@@ -43,6 +45,7 @@ greetingDescription.add(new Container({
   image: ContainerImage.fromAsset('./test-apps/greeting'),
   environment: {
     PORT: '80',
+    TEST_XRAY: 'true',
   },
 }));
 greetingDescription.add(new AppMeshExtension({ mesh }));
@@ -70,6 +73,7 @@ greeterDescription.add(new Container({
     PORT: '80',
     GREETING_URL: 'http://greeting.production',
     NAME_URL: 'http://name.production',
+    TEST_XRAY: 'true',
   },
 }));
 greeterDescription.add(new AppMeshExtension({ mesh }));
