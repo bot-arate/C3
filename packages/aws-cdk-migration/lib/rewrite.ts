@@ -24,14 +24,23 @@ import * as ts from 'typescript';
 export function rewriteImports(sourceText: string, fileName: string = 'index.ts'): string {
   const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.ES2018);
 
-  const replacements = new Array<{ original: ts.Node, updatedLocation: string }>();
+  const replacements = new Array<{ importNode: ts.Node, original: ts.Node, updatedLocation: string }>();
+  let isConstructANamedImport = false;
+  let constructQualifier: string | undefined;
 
   const visitor = <T extends ts.Node>(node: T): ts.VisitResult<T> => {
     const moduleSpecifier = getModuleSpecifier(node);
     const newTarget = moduleSpecifier && updatedLocationOf(moduleSpecifier.text);
 
     if (moduleSpecifier != null && newTarget != null) {
-      replacements.push({ original: moduleSpecifier, updatedLocation: newTarget });
+      replacements.push({ importNode: node, original: moduleSpecifier, updatedLocation: newTarget });
+
+      if (moduleSpecifier.text === '@aws-cdk/core') {
+        // Need to determine if we need to both:
+        // (a) insert an import for constructs and (b) update any references to Construct
+        isConstructANamedImport = namedImports(node).some(name => name === 'Construct');
+        constructQualifier = importNamespaceQualifier(node);
+      }
     }
 
     return node;
@@ -111,4 +120,25 @@ function updatedLocationOf(modulePath: string): string | undefined {
   }
 
   return `aws-cdk-lib/${modulePath.substring(9)}`;
+}
+
+function namedImports(node: ts.Node): string[] {
+  if (ts.isImportDeclaration(node)
+    && node.importClause?.namedBindings
+    && ts.isNamedImports(node.importClause?.namedBindings)) {
+    return node.importClause.namedBindings.elements.map(e => e.name.text);
+  }
+  return [];
+}
+
+function importNamespaceQualifier(node: ts.Node): string | undefined {
+  if (ts.isImportDeclaration(node)
+    && node.importClause?.namedBindings
+    && ts.isNamespaceImport(node.importClause?.namedBindings)) {
+    return node.importClause.namedBindings.name.text;
+  } else if (ts.isImportEqualsDeclaration(node)) {
+    return node.name.text;
+  } else {
+    return undefined;
+  }
 }
