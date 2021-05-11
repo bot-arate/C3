@@ -38,7 +38,7 @@ describe(rewriteImports, () => {
   // something before
   import * as s3 from '@aws-cdk/aws-s3';
   import * as cfndiff from '@aws-cdk/cloudformation-diff';
-  import { Construct } from "@aws-cdk/core";
+  import { Token } from "@aws-cdk/core";
   // something after
 
   console.log('Look! I did something!');`, 'subject.ts');
@@ -47,7 +47,7 @@ describe(rewriteImports, () => {
   // something before
   import * as s3 from 'aws-cdk-lib/aws-s3';
   import * as cfndiff from '@aws-cdk/cloudformation-diff';
-  import { Construct } from "aws-cdk-lib";
+  import { Token } from "aws-cdk-lib";
   // something after
 
   console.log('Look! I did something!');`);
@@ -87,5 +87,22 @@ describe(rewriteImports, () => {
     // something after
 
     console.log('Look! I did something!');`);
+  });
+
+  test('rewrites core.Construct and friends to constructs.Construct and friends', () => {
+    const output = rewriteImports(`
+    import { App, Construct, Stack } from '@aws-cdk/core';
+
+    const app = new App();
+    new Stack(app);
+    `);
+
+    expect(output).toBe(`
+    import { App, Stack } from 'aws-cdk-lib';
+    import { Construct } from 'constructs';
+
+    const app = new App();
+    new Stack(app);
+    `);
   });
 });
